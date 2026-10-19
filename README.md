@@ -17,3 +17,8 @@ make
 ```
 
 i haven't tried the demo myself (no xbox) so unsure if it works
+
+
+Used for the SRB2 Xbox 360 port
+
+libSDLXenon is also used with this which the port requires.
