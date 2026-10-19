@@ -38,11 +38,15 @@
 #include <xenos/xenos.h>
 #include <xenos/edram.h>
 #include <usb/usbmain.h>
+#include <diskio/ata.h>
 #include <console/console.h>
 #include <xenon_sound/sound.h>
 #include <xenon_smc/xenon_smc.h>
 #include <xenon_soc/xenon_power.h>
+#include <libfat/fat.h>
 
+int bdev_enum(int handle, const char **name);
+extern void delay(int);
 
 static int audio_open = 0;
 static Mix_Music *music = NULL;
@@ -107,17 +111,23 @@ void IntHandler(int sig)
 
 int main(int argc, char *argv[])
 {
-	SDL_RWops *rwfp;
+	Mix_Music *bg_music = NULL;
+	//Mix_Chunk *select_sfx = NULL;
+
+	//SDL_RWops *rwfp;
 	int audio_rate;
 	Uint16 audio_format;
 	int audio_channels;
 	int audio_buffers;
 	int audio_volume = MIX_MAX_VOLUME;
-	int looping = 0;
-	int interactive = 0;
-	int rwops = 0;
-	int i = 0;
+	//int looping = 0;
+	//int interactive = 0;
+	//int rwops = 0;
+	//int i = 0;
 
+		int handle = -1;
+		const char *s;
+		char mountpath[32];
      	xenon_make_it_faster(XENON_SPEED_FULL);
     	xenos_init(VIDEO_MODE_AUTO);
         xenon_sound_init();
@@ -125,11 +135,27 @@ int main(int argc, char *argv[])
     	usb_init();
     	usb_do_poll();
 
+		xenon_ata_init();
+		xenon_atapi_init();
+
+		fatInitDefault();
+
+		printf("Waiting for USB device to mount...\n");
+		handle=bdev_enum(handle,&s);
+		if(handle<0) return 0;
+
+		sprintf(mountpath, "%s:/", s);
+		chdir(mountpath);
+
+		char /*sfx_path[64],*/ mus_path[64];
+		//sprintf(sfx_path, "%s:/test.wav", s);
+		sprintf(mus_path, "%s:/test2.ogg", s);
+
 	/* Initialize variables */
-	audio_rate = 22050;
+	audio_rate = 48000;
 	audio_format = AUDIO_S16;
 	audio_channels = 2;
-	audio_buffers = 4096;
+	audio_buffers = 16384;
 
 
 	/* Initialize the SDL library */
@@ -161,43 +187,58 @@ int main(int argc, char *argv[])
 	/* Set the external music player, if any */
 	Mix_SetMusicCMD(getenv("MUSIC_CMD"));
 
-	while (1) {
-		next_track = 0;
+	//select_sfx = Mix_LoadWAV(sfx_path);
 
-		/* Load the requested music file */
-		if ( rwops ) {
-			rwfp = SDL_RWFromFile(argv[i], "rb");
-			music = Mix_LoadMUS_RW(rwfp);
-		} else {
-			music = Mix_LoadMUS("uda:/chip4mat.mod");
-		}
-		if ( music == NULL ) {
-			fprintf(stderr, "Couldn't load %s: %s\n",
-				argv[i], SDL_GetError());
-			CleanUp(2);
-		}
-
-		/* Play and then exit */
-		printf("Playing...\n");
-		Mix_FadeInMusic(music,looping,2000);
-		while ( !next_track && (Mix_PlayingMusic() || Mix_PausedMusic()) ) {
-			if(interactive)
-				Menu();
-			else
-				SDL_Delay(100);
-		}
-		Mix_FreeMusic(music);
-		if ( rwops ) {
-			SDL_FreeRW(rwfp);
-		}
-		music = NULL;
-
-		/* If the user presses Ctrl-C more than once, exit. */
-		SDL_Delay(500);
-		if ( next_track > 1 ) break;
-
-		i++;
+	// 1. Open the file natively via LibXenon
+	FILE *file = fopen(mus_path, "rb");
+	if (!file) {
+		printf("Failed to open file!\n");
+		return -1;
 	}
+
+	// 2. Get the exact file size
+	fseek(file, 0, SEEK_END);
+	long fileSize = ftell(file);
+	fseek(file, 0, SEEK_SET);
+
+	printf("Loading %ld bytes directly into RAM...\n", fileSize);
+
+	// 3. Allocate memory and read the ENTIRE file into RAM
+	unsigned char *audioBuffer = (unsigned char *)malloc(fileSize);
+	fread(audioBuffer, 1, fileSize, file);
+	fclose(file);
+
+	// 4. Hand the memory buffer over to SDL_mixer
+	SDL_RWops *rw = SDL_RWFromMem(audioBuffer, fileSize);
+
+	// Revert to the standard function since the Xenon fork lacks MUSType
+	bg_music = Mix_LoadMUS_RW(rw);
+
+	// 5. Check if it actually loaded
+	if (bg_music == NULL) {
+		printf("\n[ERROR] Mix_LoadMUS failed: %s\n", Mix_GetError());
+		SDL_Delay(7000); // Pause for 7 seconds so you can read the screen!
+		return -1;
+	}
+
+	// 6. Check if it actually started playing
+	if (Mix_PlayMusic(bg_music, -1) == -1) {
+		printf("\n[ERROR] Mix_PlayMusic failed: %s\n", Mix_GetError());
+		SDL_Delay(7000);
+		return -1;
+	}
+
+	printf("\nSUCCESS: Playing directly from RAM!\n");
+
+	// 7. Simplified, clean testing loop
+	while (Mix_PlayingMusic()) {
+		usb_do_poll();
+		SDL_Delay(10); // Keep the main thread alive
+	}
+
+	Mix_FreeMusic(bg_music);
+	SDL_FreeRW(rw); // Clean up the RWops
+	free(audioBuffer); // Clean up our massive RAM allocation
 	CleanUp(0);
 
 	/* Not reached, but fixes compiler warnings */

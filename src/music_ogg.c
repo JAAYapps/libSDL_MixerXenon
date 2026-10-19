@@ -144,7 +144,7 @@ static void OGG_getsome(OGG_music *music)
 #ifdef OGG_USE_TREMOR
 	len = vorbis.ov_read(&music->vf, data, sizeof(data), &section);
 #else
-	len = vorbis.ov_read(&music->vf, data, sizeof(data), 0, 2, 1, &section);
+	len = vorbis.ov_read(&music->vf, data, sizeof(data), 1, 2, 1, &section);
 #endif
 	if ( len <= 0 ) {
 		if ( len == 0 ) {

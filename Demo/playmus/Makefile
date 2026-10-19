@@ -34,7 +34,7 @@ LDFLAGS	=	-g $(MACHDEP) -Wl,--gc-sections -Wl,-Map,$(notdir $@).map
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:=	 -lSDL_mixer -lSDL -lxenon -lpng -lm -lz
+LIBS	:=	 -lSDL_mixer -lvorbisfile -lvorbis -logg -lSDL -lpng -lfat -lxenon -lz -lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

@@ -8,7 +8,7 @@ AS	= xenon-as
 RANLIB	= xenon-ranlib
 SRC_DIR = ./src
 
-CFLAGS=$(INCLUDE) -ffunction-sections -fdata-sections  -mno-altivec -mhard-float -mcpu=cell -mtune=cell -m32 -fno-pic -mpowerpc64 -DXENON -DWAV_MUSIC -DMOD_MUSIC -DMID_MUSIC -DUSE_TIMIDITY_MIDI -I$(DEVKITXENON)/usr/include/ -I$(DEVKITXENON)/usr/include/SDL/ -I$(SRC_DIR)/mikmod -I$(SRC_DIR)/timidity
+CFLAGS=$(INCLUDE) -O2 -DWORDS_BIGENDIAN -D_BIG_ENDIAN -ffunction-sections -fdata-sections  -mno-altivec -mhard-float -mcpu=cell -mtune=cell -m32 -fno-pic -mpowerpc64 -DXENON -DWAV_MUSIC -DMOD_MUSIC -DMID_MUSIC -DUSE_TIMIDITY_MIDI -DOGG_MUSIC -I$(DEVKITXENON)/usr/include/ -I$(DEVKITXENON)/usr/include/SDL/ -I$(SRC_DIR)/mikmod -I$(SRC_DIR)/timidity
 
 TARGET  = libSDL_mixer.a
 SOURCES = $(filter-out $(SRC_DIR)/playwave.c $(SRC_DIR)/playmus.c $(SRC_DIR)/music_cmd.c, $(wildcard $(SRC_DIR)/*.c)) $(wildcard $(SRC_DIR)/mikmod/*.c) $(wildcard $(SRC_DIR)/timidity/*.c) 
